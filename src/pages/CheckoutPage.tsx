@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from '@/components/ui/use-toast';
-import { Check, CreditCard, ShoppingBag } from 'lucide-react';
+import { Check, CreditCard, ShoppingBag, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Address } from '@/types';
 
 const CheckoutPage = () => {
   const { items, subtotal, clearCart } = useCart();
@@ -48,7 +50,7 @@ const CheckoutPage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
   
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
     // Validate form
@@ -69,11 +71,66 @@ const CheckoutPage = () => {
       }
     }
     
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to place an order',
+        variant: 'destructive',
+      });
+      navigate('/login?redirect=checkout');
+      return;
+    }
+    
     // Process payment
     setIsProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
+    // Create shipping address
+    const shippingAddress: Address = {
+      line1: formData.address,
+      city: formData.city,
+      state: formData.state,
+      postalCode: formData.postalCode,
+      country: formData.country,
+    };
+    
+    try {
+      // Call Stripe payment endpoint here if needed
+      // For now, we'll just create the order in the database
+      
+      const { error } = await supabase.from('orders').insert({
+        userid: user.id,
+        items: items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.product.price
+        })),
+        total: total,
+        status: 'pending',
+        shippingaddress: {
+          ...shippingAddress,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone
+        }
+      });
+      
+      if (error) throw error;
+      
+      // Update product quantities
+      for (const item of items) {
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({ 
+            quantity: item.product.quantity - item.quantity 
+          })
+          .eq('id', item.productId);
+          
+        if (updateError) {
+          console.error('Error updating product quantity:', updateError);
+        }
+      }
+      
       setIsProcessing(false);
       clearCart();
       
@@ -84,7 +141,16 @@ const CheckoutPage = () => {
       });
       
       navigate('/order-confirmation');
-    }, 2000);
+    } catch (error) {
+      console.error('Error placing order:', error);
+      setIsProcessing(false);
+      
+      toast({
+        title: 'Error',
+        description: 'There was a problem placing your order. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
   
   if (items.length === 0) {
@@ -329,7 +395,14 @@ const CheckoutPage = () => {
               </div>
               
               <Button type="submit" className="w-full" disabled={isProcessing}>
-                {isProcessing ? 'Processing...' : `Pay $${total.toFixed(2)}`}
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Pay $${total.toFixed(2)}`
+                )}
               </Button>
             </form>
           </div>
@@ -346,6 +419,9 @@ const CheckoutPage = () => {
                         src={item.product.imageUrl} 
                         alt={item.product.title} 
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
                       />
                     </div>
                     <div className="ml-4 flex-grow">
