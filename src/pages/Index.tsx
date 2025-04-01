@@ -4,15 +4,81 @@ import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { ProductGrid } from '@/components/products/ProductGrid';
-import { products } from '@/data/products';
-
-const featuredProducts = products.slice(0, 4);
-const newArrivals = [...products].sort((a, b) => 
-  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-).slice(0, 4);
+import { Product } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
+import { mapProductRowsToProducts } from '@/integrations/supabase/dbTypes';
+import { Loader2 } from 'lucide-react';
 
 const HomePage = () => {
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [newArrivals, setNewArrivals] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all products
+        const { data, error } = await supabase
+          .from('products')
+          .select('*');
+        
+        if (error) {
+          throw error;
+        }
+        
+        const allProducts = mapProductRowsToProducts(data);
+        
+        // Get featured products (first 4)
+        setFeaturedProducts(allProducts.slice(0, 4));
+        
+        // Get new arrivals (sort by creation date and take first 4)
+        const sorted = [...allProducts].sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setNewArrivals(sorted.slice(0, 4));
+      } catch (err) {
+        console.error('Error fetching products:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const renderProductCard = (product: Product) => (
+    <div key={product.id} className="product-card">
+      <Link to={`/products/${product.id}`}>
+        <div className="aspect-square overflow-hidden">
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            className="h-full w-full object-cover transition-transform hover:scale-105"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/placeholder.svg';
+            }}
+          />
+        </div>
+        <div className="p-4">
+          <h3 className="font-medium line-clamp-1">{product.title}</h3>
+          <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+            {product.description}
+          </p>
+          <div className="flex justify-between items-center mt-2">
+            <span className="font-bold">${product.price.toFixed(2)}</span>
+            {product.quantity === 0 ? (
+              <span className="badge-out-of-stock">Out of Stock</span>
+            ) : (
+              <span className="badge-in-stock">In Stock</span>
+            )}
+          </div>
+        </div>
+      </Link>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -46,35 +112,18 @@ const HomePage = () => {
             </Button>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
-              <div key={product.id} className="product-card">
-                <Link to={`/products/${product.id}`}>
-                  <div className="aspect-square overflow-hidden">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.title}
-                      className="h-full w-full object-cover transition-transform hover:scale-105"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-medium line-clamp-1">{product.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                      {product.description}
-                    </p>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="font-bold">${product.price.toFixed(2)}</span>
-                      {product.quantity === 0 ? (
-                        <span className="badge-out-of-stock">Out of Stock</span>
-                      ) : (
-                        <span className="badge-in-stock">In Stock</span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading products...</span>
+            </div>
+          ) : featuredProducts.length === 0 ? (
+            <p className="text-center py-8 text-gray-500">No featured products available.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {featuredProducts.map(renderProductCard)}
+            </div>
+          )}
         </section>
         
         {/* Categories */}
@@ -135,35 +184,18 @@ const HomePage = () => {
             </Button>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {newArrivals.map((product) => (
-              <div key={product.id} className="product-card">
-                <Link to={`/products/${product.id}`}>
-                  <div className="aspect-square overflow-hidden">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.title}
-                      className="h-full w-full object-cover transition-transform hover:scale-105"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-medium line-clamp-1">{product.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                      {product.description}
-                    </p>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="font-bold">${product.price.toFixed(2)}</span>
-                      {product.quantity === 0 ? (
-                        <span className="badge-out-of-stock">Out of Stock</span>
-                      ) : (
-                        <span className="badge-in-stock">In Stock</span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading products...</span>
+            </div>
+          ) : newArrivals.length === 0 ? (
+            <p className="text-center py-8 text-gray-500">No new arrivals available.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {newArrivals.map(renderProductCard)}
+            </div>
+          )}
         </section>
         
         {/* Testimonials */}

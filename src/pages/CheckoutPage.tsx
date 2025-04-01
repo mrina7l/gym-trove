@@ -56,10 +56,10 @@ const CheckoutPage = () => {
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: {
           items: items.map(item => ({
-            productId: item.productId,
+            productId: item.product.id,
             quantity: item.quantity,
           })),
-          userId: user.id, // Make sure this is a valid UUID
+          userId: user.id,
           total: total
         },
       });
@@ -123,7 +123,7 @@ const CheckoutPage = () => {
               <h2 className="text-xl font-semibold mb-4">Review Your Order</h2>
               <p className="text-gray-600 mb-6">
                 You'll be redirected to our secure payment processor to complete your purchase. 
-                Your payment details will be handled securely.
+                Your payment details will be handled securely by Stripe.
               </p>
               
               <div className="space-y-4 mb-6">

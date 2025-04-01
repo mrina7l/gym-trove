@@ -17,11 +17,15 @@ serve(async (req) => {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { 
+        auth: {
+          persistSession: false,
+        }
+      }
     );
     
     // Create sample products
     const products = [];
-    const categories = ['Protein', 'Amino Acids', 'Pre-Workout', 'Vitamins', 'Accessories'];
     const demoProducts = [
       {
         title: 'Premium Whey Protein Isolate',
@@ -67,25 +71,95 @@ serve(async (req) => {
         category: 'Protein',
         tags: ['vegan', 'plant-based', 'dairy-free'],
         quantity: 30
+      },
+      {
+        title: 'Creatine Monohydrate Powder',
+        description: 'Pure creatine monohydrate to increase strength and power output during high-intensity workouts.',
+        price: 24.99,
+        imageurl: 'https://images.unsplash.com/photo-1579126038374-6064e9370f0f?w=800&auto=format&fit=crop',
+        category: 'Supplements',
+        tags: ['creatine', 'strength', 'power'],
+        quantity: 75
+      },
+      {
+        title: 'Protein Bar Variety Pack',
+        description: 'Convenient protein bars with 20g protein each. Pack includes chocolate, peanut butter, and cookies & cream flavors.',
+        price: 29.99,
+        imageurl: 'https://images.unsplash.com/photo-1656278160957-958d442cae55?w=800&auto=format&fit=crop',
+        category: 'Protein',
+        tags: ['protein bar', 'snack', 'on-the-go'],
+        quantity: 40
+      },
+      {
+        title: 'Joint Support Formula',
+        description: 'Complete joint support with glucosamine, chondroitin, MSM, and turmeric for athletes and active individuals.',
+        price: 34.99,
+        imageurl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&auto=format&fit=crop',
+        category: 'Vitamins',
+        tags: ['joint health', 'recovery', 'anti-inflammatory'],
+        quantity: 25
+      },
+      {
+        title: 'Premium Blender Bottle',
+        description: 'High-quality 28oz blender bottle with BlenderBall wire whisk for smooth, clump-free protein shakes.',
+        price: 12.99,
+        imageurl: 'https://images.unsplash.com/photo-1610725664285-7c57e6eeac3f?w=800&auto=format&fit=crop',
+        category: 'Accessories',
+        tags: ['shaker', 'bottle', 'blender'],
+        quantity: 100
+      },
+      {
+        title: 'Omega-3 Fish Oil',
+        description: 'Pure fish oil capsules with 1000mg of Omega-3 fatty acids for heart health and recovery support.',
+        price: 19.99,
+        imageurl: 'https://images.unsplash.com/photo-1577460551100-907eb5455cedc?w=800&auto=format&fit=crop',
+        category: 'Vitamins',
+        tags: ['omega-3', 'fish oil', 'heart health'],
+        quantity: 55
       }
     ];
     
-    // Insert products
+    // First, remove any existing products to avoid duplicates
+    const { error: deleteError } = await supabaseClient
+      .from('products')
+      .delete()
+      .neq('id', '0'); // Delete all products
+    
+    if (deleteError) {
+      console.error('Error deleting existing products:', deleteError);
+    }
+    
+    // Add the service role key to bypass RLS policies
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const adminKey = authHeader.replace('Bearer ', '');
+      supabaseClient.auth.setAuth(adminKey);
+    }
+    
+    // Insert new products one by one to see detailed errors
     for (const product of demoProducts) {
-      const { data, error } = await supabaseClient
-        .from('products')
-        .insert(product)
-        .select();
-      
-      if (error) {
-        console.error('Failed to create product:', error);
-      } else {
-        products.push(data[0]);
+      try {
+        const { data, error } = await supabaseClient
+          .from('products')
+          .insert(product)
+          .select();
+        
+        if (error) {
+          console.error('Failed to create product:', error);
+        } else {
+          products.push(data[0]);
+        }
+      } catch (insertError) {
+        console.error('Exception creating product:', insertError);
       }
     }
     
     return new Response(
-      JSON.stringify({ success: true, message: `Successfully created ${products.length} products`, products }),
+      JSON.stringify({ 
+        success: true, 
+        message: `Successfully created ${products.length} products`, 
+        products 
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
