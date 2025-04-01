@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.manage-products]
 verify_jwt = false
+
+[functions.add-products]
+verify_jwt = false

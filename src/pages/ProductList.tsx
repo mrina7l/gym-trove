@@ -6,6 +6,7 @@ import { ProductGrid } from '@/components/products/ProductGrid';
 import { Product } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { mapProductRowsToProducts } from '@/integrations/supabase/dbTypes';
 
 const ProductList = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -25,19 +26,8 @@ const ProductList = () => {
           throw error;
         }
         
-        const formattedProducts = data.map(item => ({
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          price: item.price,
-          imageUrl: item.imageurl,
-          category: item.category,
-          tags: item.tags,
-          quantity: item.quantity,
-          createdAt: item.createdat
-        }));
-        
-        setProducts(formattedProducts);
+        // Use the helper function to map database rows to our Product type
+        setProducts(mapProductRowsToProducts(data));
       } catch (err) {
         console.error('Error fetching products:', err);
         setError('Failed to load products. Please try again.');

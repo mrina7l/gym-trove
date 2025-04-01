@@ -15,21 +15,17 @@ serve(async (req) => {
   }
 
   try {
-    const { items, userId } = await req.json();
-    
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid items data' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
-    }
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+      apiVersion: '2023-10-16',
+    });
 
-    if (!userId || typeof userId !== 'string' || !userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    // Parse request body
+    const { items, userId, total } = await req.json();
+    
+    if (!items || !items.length || !userId) {
       return new Response(
-        JSON.stringify({ error: 'Invalid user ID format. Must be a valid UUID.' }),
+        JSON.stringify({ error: 'Missing required fields' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -38,28 +34,21 @@ serve(async (req) => {
     }
 
     // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-    // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      apiVersion: '2023-10-16',
-    });
-
-    // Fetch products for items to ensure we have valid data
+    // Get product details from the database
     const productIds = items.map(item => item.productId);
-    
     const { data: products, error: productsError } = await supabaseClient
       .from('products')
       .select('*')
       .in('id', productIds);
 
-    if (productsError || !products) {
+    if (productsError) {
       console.error('Error fetching products:', productsError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch products' }),
+        JSON.stringify({ error: 'Failed to fetch product details' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -70,14 +59,8 @@ serve(async (req) => {
     // Create line items for Stripe checkout
     const lineItems = items.map(item => {
       const product = products.find(p => p.id === item.productId);
-      
       if (!product) {
         throw new Error(`Product not found: ${item.productId}`);
-      }
-      
-      // Check inventory
-      if (product.quantity < item.quantity) {
-        throw new Error(`Not enough inventory for ${product.title}`);
       }
       
       return {
@@ -88,45 +71,31 @@ serve(async (req) => {
             description: product.description,
             images: [product.imageurl],
           },
-          unit_amount: Math.round(product.price * 100), // Stripe uses cents
+          unit_amount: Math.round(product.price * 100), // Convert to cents
         },
         quantity: item.quantity,
       };
     });
 
-    // Calculate totals for order metadata
-    const subtotal = items.reduce((total, item) => {
-      const product = products.find(p => p.id === item.productId);
-      return total + (product ? product.price * item.quantity : 0);
-    }, 0);
-    
-    const taxRate = 0.08; // 8% tax
-    const taxAmount = subtotal * taxRate;
-    const shippingCost = subtotal > 100 ? 0 : 5.99;
-    const total = subtotal + taxAmount + shippingCost;
-
-    // Create the checkout session
+    // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${req.headers.get('origin')}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get('origin')}/checkout`,
+      success_url: `${req.headers.get('origin') || 'http://localhost:5173'}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get('origin') || 'http://localhost:5173'}/cart`,
+      shipping_address_collection: {
+        allowed_countries: ['US', 'CA', 'GB'],
+      },
       metadata: {
-        userId,
+        userId: userId,
         items: JSON.stringify(items),
-        subtotal: subtotal.toFixed(2),
-        tax: taxAmount.toFixed(2),
-        shipping: shippingCost.toFixed(2),
-        total: total.toFixed(2),
+        total: total.toString()
       },
     });
 
     return new Response(
-      JSON.stringify({ 
-        url: session.url,
-        sessionId: session.id,
-      }),
+      JSON.stringify({ url: session.url }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

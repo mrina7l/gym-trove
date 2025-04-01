@@ -21,7 +21,17 @@ const CheckoutPage = () => {
     if (items.length === 0) {
       navigate('/products');
     }
-  }, [items, navigate]);
+    
+    // If not logged in, redirect to login
+    if (!user) {
+      toast({
+        title: 'Login Required',
+        description: 'You must be logged in to checkout',
+        variant: 'destructive',
+      });
+      navigate('/login?redirect=checkout');
+    }
+  }, [items, navigate, user]);
   
   const shippingCost = subtotal > 100 ? 0 : 5.99;
   const taxRate = 0.08; // 8% tax
@@ -49,7 +59,8 @@ const CheckoutPage = () => {
             productId: item.productId,
             quantity: item.quantity,
           })),
-          userId: user.id,
+          userId: user.id, // Make sure this is a valid UUID
+          total: total
         },
       });
       
