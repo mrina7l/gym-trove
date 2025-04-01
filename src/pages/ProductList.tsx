@@ -3,66 +3,71 @@ import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { ProductGrid } from '@/components/products/ProductGrid';
-import { products } from '@/data/products';
-import { useSearchParams } from 'react-router-dom';
+import { Product } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
 
-const ProductListPage = () => {
-  const [searchParams] = useSearchParams();
-  const categoryParam = searchParams.get('category');
-  const searchQuery = searchParams.get('search');
-  const sortBy = searchParams.get('sort');
-  
-  let filteredProducts = [...products];
-  
-  // Filter by category if provided
-  if (categoryParam) {
-    filteredProducts = filteredProducts.filter(product => 
-      product.category === categoryParam
-    );
-  }
-  
-  // Filter by search query if provided
-  if (searchQuery) {
-    const query = searchQuery.toLowerCase();
-    filteredProducts = filteredProducts.filter(product => 
-      product.title.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query) ||
-      product.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-  }
-  
-  // Sort products if sortBy is provided
-  if (sortBy) {
-    switch (sortBy) {
-      case 'price-low':
-        filteredProducts.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filteredProducts.sort((a, b) => b.price - a.price);
-        break;
-      case 'newest':
-        filteredProducts.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        break;
-      case 'popularity':
-        // For a real app, this would sort by sales or ratings
-        break;
-      default:
-        break;
-    }
-  }
-  
+const ProductList = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('products')
+          .select('*');
+        
+        if (error) {
+          throw error;
+        }
+        
+        const formattedProducts = data.map(item => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          price: item.price,
+          imageUrl: item.imageurl,
+          category: item.category,
+          tags: item.tags,
+          quantity: item.quantity,
+          createdAt: item.createdat
+        }));
+        
+        setProducts(formattedProducts);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setError('Failed to load products. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">
-          {categoryParam ? `${categoryParam} Products` : 'All Products'}
-        </h1>
+        <h1 className="text-3xl font-bold mb-8">All Products</h1>
         
-        <ProductGrid products={filteredProducts} />
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Loading products...</span>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-500">{error}</p>
+          </div>
+        ) : (
+          <ProductGrid products={products} />
+        )}
       </main>
       
       <Footer />
@@ -70,4 +75,4 @@ const ProductListPage = () => {
   );
 };
 
-export default ProductListPage;
+export default ProductList;

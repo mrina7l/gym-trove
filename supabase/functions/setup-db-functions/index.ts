@@ -31,8 +31,40 @@ serve(async (req) => {
   );
 
   try {
-    // Create the decrement_quantity function
-    const { error: functionError } = await supabaseClient.rpc('create_decrement_quantity_function');
+    // Create the SQL function to decrement product quantity
+    const createFunctionSQL = `
+      CREATE OR REPLACE FUNCTION decrement_quantity(p_id UUID, qty INTEGER)
+      RETURNS INTEGER
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      AS $$
+      DECLARE
+        current_qty INTEGER;
+      BEGIN
+        -- Get current quantity
+        SELECT quantity INTO current_qty
+        FROM products
+        WHERE id = p_id;
+        
+        -- Check if we have enough stock
+        IF current_qty >= qty THEN
+          -- Update the quantity
+          UPDATE products
+          SET quantity = quantity - qty
+          WHERE id = p_id;
+          
+          -- Return the new quantity
+          RETURN current_qty - qty;
+        ELSE
+          -- Not enough stock
+          RETURN current_qty;
+        END IF;
+      END;
+      $$;
+    `;
+
+    const { error: functionError } = await supabaseClient
+      .rpc('create_decrement_quantity_function', { sql: createFunctionSQL });
     
     if (functionError) {
       console.error('Error creating function:', functionError);

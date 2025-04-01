@@ -1,2 +1,14 @@
 
 project_id = "detxupzmttiduswldkob"
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.setup-db-functions]
+verify_jwt = false
+
+[functions.manage-products]
+verify_jwt = false

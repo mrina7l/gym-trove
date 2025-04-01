@@ -1,38 +1,98 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { getProductById, products } from '@/data/products';
 import { useCart } from '@/context/CartContext';
-import { ProductGrid } from '@/components/products/ProductGrid';
-import { Minus, Plus } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Product } from '@/types';
+import { ChevronLeft, ShoppingCart, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-const ProductDetailPage = () => {
+const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const product = getProductById(id!);
-  const { addItem } = useCart();
+  const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
-  
-  // Find related products (same category)
-  const relatedProducts = product
-    ? products
-        .filter(
-          (p) => p.category === product.category && p.id !== product.id
-        )
-        .slice(0, 4)
-    : [];
-  
-  if (!product) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { addItem } = useCart();
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (!data) {
+          setError('Product not found');
+          return;
+        }
+        
+        setProduct({
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          price: data.price,
+          imageUrl: data.imageurl,
+          category: data.category,
+          tags: data.tags,
+          quantity: data.quantity,
+          createdAt: data.createdat
+        });
+      } catch (err) {
+        console.error('Error fetching product:', err);
+        setError('Failed to load product details. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProduct();
+  }, [id]);
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setQuantity(Number(e.target.value));
+  };
+
+  const handleAddToCart = () => {
+    if (product) {
+      addItem(product, quantity);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow container mx-auto px-4 py-8 flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Product Not Found</h1>
-            <p className="mb-6">The product you're looking for doesn't exist or has been removed.</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading product details...</span>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <h2 className="text-xl font-medium mb-2">Product Not Found</h2>
+            <p className="text-gray-500 mb-6">
+              {error || "The product you're looking for doesn't exist."}
+            </p>
             <Button asChild>
               <Link to="/products">Back to Products</Link>
             </Button>
@@ -42,118 +102,75 @@ const ProductDetailPage = () => {
       </div>
     );
   }
-  
-  const handleQuantityChange = (value: number) => {
-    if (value < 1) return;
-    if (value > product.quantity) return;
-    setQuantity(value);
-  };
-  
-  const handleAddToCart = () => {
-    addItem(product, quantity);
-  };
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
       <main className="flex-grow container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Link to="/products" className="text-primary hover:underline">
-            ← Back to Products
-          </Link>
-        </div>
+        <Link to="/products" className="inline-flex items-center mb-4 hover:text-primary transition-colors">
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back to Products
+        </Link>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+          <div className="relative aspect-square overflow-hidden rounded-lg">
             <img
               src={product.imageUrl}
               alt={product.title}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
             />
           </div>
           
           <div>
-            <div className="flex items-center space-x-2 mb-2">
-              <Badge>{product.category}</Badge>
-              {product.quantity === 0 ? (
-                <Badge variant="destructive">Out of Stock</Badge>
-              ) : (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  In Stock
-                </Badge>
-              )}
+            <h1 className="text-3xl font-bold mb-2">{product.title}</h1>
+            <p className="text-gray-500 mb-4">{product.description}</p>
+            
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-bold text-2xl">${product.price.toFixed(2)}</span>
+              <div className="text-gray-500">
+                {product.quantity} in stock
+              </div>
             </div>
             
-            <h1 className="text-3xl font-bold mb-2">{product.title}</h1>
-            
-            <div className="text-2xl font-bold mb-4">${product.price.toFixed(2)}</div>
-            
-            <p className="text-gray-700 mb-6">{product.description}</p>
-            
-            <div className="border-t border-b py-4 mb-6">
-              <div className="mb-4">
-                <div className="text-sm text-gray-500 mb-1">Quantity</div>
-                <div className="flex items-center">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleQuantityChange(quantity - 1)}
-                    disabled={quantity === 1 || product.quantity === 0}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="mx-4 font-medium w-8 text-center">{quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleQuantityChange(quantity + 1)}
-                    disabled={quantity === product.quantity || product.quantity === 0}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
+            <div className="flex items-center space-x-4 mb-6">
+              <div className="flex items-center space-x-2">
+                <label htmlFor="quantity" className="text-sm font-medium">Quantity:</label>
+                <select
+                  id="quantity"
+                  value={quantity}
+                  onChange={handleQuantityChange}
+                  className="block w-24 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                >
+                  {Array.from({ length: Math.min(10, product.quantity) }, (_, i) => i + 1).map((num) => (
+                    <option key={num} value={num}>{num}</option>
+                  ))}
+                </select>
               </div>
               
-              <div className="text-sm text-gray-500 mb-1">
-                {product.quantity > 0 
-                  ? `${product.quantity} items available` 
-                  : 'Currently out of stock'}
-              </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button 
-                className="flex-1"
-                onClick={handleAddToCart}
-                disabled={product.quantity === 0}
-              >
-                {product.quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
-              </Button>
-              <Button variant="outline" className="flex-1">
-                Add to Wishlist
+              <Button onClick={handleAddToCart} disabled={product.quantity === 0}>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Add to Cart
               </Button>
             </div>
             
-            <div className="mt-6">
-              <h3 className="font-medium mb-2">Tags</h3>
-              <div className="flex flex-wrap gap-2">
-                {product.tags.map((tag) => (
-                  <Badge key={tag} variant="outline">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
+            <div>
+              <h4 className="text-lg font-medium mb-2">Category:</h4>
+              <p>{product.category}</p>
             </div>
+            
+            {product.tags.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-lg font-medium mb-2">Tags:</h4>
+                <div className="flex space-x-2">
+                  {product.tags.map((tag) => (
+                    <span key={tag} className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-sm">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        
-        {relatedProducts.length > 0 && (
-          <section className="mt-16">
-            <h2 className="text-2xl font-bold mb-6">Related Products</h2>
-            <ProductGrid products={relatedProducts} />
-          </section>
-        )}
       </main>
       
       <Footer />
@@ -161,4 +178,4 @@ const ProductDetailPage = () => {
   );
 };
 
-export default ProductDetailPage;
+export default ProductDetail;

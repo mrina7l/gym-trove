@@ -25,13 +25,13 @@ const OrderConfirmation = () => {
       return;
     }
     
-    // Simulate order confirmation and clear cart
+    // Clear cart and show success
     const confirmOrder = async () => {
       try {
         setIsLoading(true);
-        // In a real app, we would verify the payment with our backend here
-        // For now, we're just clearing the cart and showing success
         clearCart();
+        // Generate a random order number just for display
+        // In a real app, this would come from the database
         setOrderNumber(Math.floor(Math.random() * 1000000).toString().padStart(6, '0'));
       } catch (error) {
         console.error('Error confirming order:', error);
