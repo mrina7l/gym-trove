@@ -1,24 +1,62 @@
 
-import { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { CheckCircle } from 'lucide-react';
+import { useCart } from '@/context/CartContext';
+import { CheckCircle, Loader2 } from 'lucide-react';
 
 const OrderConfirmation = () => {
   const { user } = useAuth();
+  const { clearCart } = useCart();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [isLoading, setIsLoading] = useState(true);
+  const [orderNumber, setOrderNumber] = useState('');
+  
+  const sessionId = searchParams.get('session_id');
   
   useEffect(() => {
-    // If user somehow reaches this page without completing checkout, redirect to home
-    if (!user) {
+    // If user is not logged in or no session_id, redirect to home
+    if (!user || !sessionId) {
       navigate('/');
+      return;
     }
-  }, [user, navigate]);
+    
+    // Simulate order confirmation and clear cart
+    const confirmOrder = async () => {
+      try {
+        setIsLoading(true);
+        // In a real app, we would verify the payment with our backend here
+        // For now, we're just clearing the cart and showing success
+        clearCart();
+        setOrderNumber(Math.floor(Math.random() * 1000000).toString().padStart(6, '0'));
+      } catch (error) {
+        console.error('Error confirming order:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    confirmOrder();
+  }, [user, sessionId, navigate, clearCart]);
   
-  const orderNumber = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow container mx-auto px-4 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+            <h2 className="text-xl font-medium">Processing your order...</h2>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -33,7 +71,7 @@ const OrderConfirmation = () => {
           <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
           
           <p className="text-gray-600 mb-6">
-            Your order has been received and is being processed. Thank you for shopping with YourProtein!
+            Your order has been received and is being processed. Thank you for shopping with us!
           </p>
           
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
