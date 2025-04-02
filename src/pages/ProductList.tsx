@@ -16,7 +16,7 @@ const ProductList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addingProducts, setAddingProducts] = useState(false);
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
 
   const fetchProducts = async () => {
     try {
@@ -81,7 +81,7 @@ const ProductList = () => {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">All Products</h1>
           
-          {user && user.email === 'admin@example.com' && (
+          {isAdmin && (
             <Button 
               onClick={handleAddProducts} 
               disabled={addingProducts}
@@ -116,7 +116,7 @@ const ProductList = () => {
         ) : products.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-4">No products found.</p>
-            {user && user.email === 'admin@example.com' && (
+            {isAdmin && (
               <Button onClick={handleAddProducts} disabled={addingProducts}>
                 {addingProducts ? 'Adding Products...' : 'Add Sample Products'}
               </Button>

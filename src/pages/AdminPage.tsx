@@ -13,9 +13,8 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 const AdminPage = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -37,32 +36,18 @@ const AdminPage = () => {
     }
     
     // Check if user is an admin
-    const checkAdminStatus = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Call an admin-check function or query admin status
-        const { data, error } = await supabase.functions.invoke('check-admin', {
-          body: { userId: user.id }
-        });
-        
-        if (error || !data?.isAdmin) {
-          // Not an admin, redirect to home
-          navigate('/');
-          return;
-        }
-        
-        setIsAdmin(true);
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-        navigate('/');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "You need admin privileges to access this page",
+        variant: "destructive",
+      });
+      navigate('/');
+      return;
+    }
     
-    checkAdminStatus();
-  }, [user, navigate]);
+    setIsLoading(false);
+  }, [user, isAdmin, navigate]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -150,10 +135,6 @@ const AdminPage = () => {
         <Footer />
       </div>
     );
-  }
-  
-  if (!isAdmin) {
-    return null; // Redirect handled in useEffect
   }
   
   return (

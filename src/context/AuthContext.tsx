@@ -2,13 +2,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '@/types';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  checkAdminStatus: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,15 +19,37 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     // Check for stored user on mount
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      
+      // Check admin status
+      if (parsedUser && parsedUser.email === 'admin@example.com') {
+        setIsAdmin(true);
+      }
     }
     setIsLoading(false);
   }, []);
+
+  const checkAdminStatus = async (): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      // For simplicity, we'll just check if the email is admin@example.com
+      // In a real app, you'd call the edge function to check role-based permissions
+      const isUserAdmin = user.email === 'admin@example.com';
+      setIsAdmin(isUserAdmin);
+      return isUserAdmin;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -39,9 +64,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
+      
+      // Set admin status if email is admin@example.com
+      const isUserAdmin = email === 'admin@example.com';
+      setIsAdmin(isUserAdmin);
+      
       toast({
         title: 'Login successful',
-        description: 'Welcome back!',
+        description: isUserAdmin ? 'Welcome back, Admin!' : 'Welcome back!',
       });
     } catch (error) {
       toast({
@@ -68,9 +98,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
+      
+      // Set admin status if email is admin@example.com
+      const isUserAdmin = email === 'admin@example.com';
+      setIsAdmin(isUserAdmin);
+      
       toast({
         title: 'Signup successful',
-        description: 'Your account has been created',
+        description: isUserAdmin ? 'Admin account has been created' : 'Your account has been created',
       });
     } catch (error) {
       toast({
@@ -90,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // This would be a real API call in a production app
       localStorage.removeItem('user');
       setUser(null);
+      setIsAdmin(false);
       toast({
         title: 'Logged out',
         description: 'You have been logged out successfully',
@@ -106,7 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAdmin, login, signup, logout, checkAdminStatus }}>
       {children}
     </AuthContext.Provider>
   );
