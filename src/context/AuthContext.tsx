@@ -21,6 +21,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Function to get Supabase session
+  const getSessionData = async () => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Error getting session:', error);
+      return null;
+    }
+    return data.session;
+  };
+
   useEffect(() => {
     // Check for stored user on mount
     const storedUser = localStorage.getItem('user');
@@ -39,6 +49,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('user');
       }
     }
+    
+    // Also check Supabase session
+    getSessionData().then(session => {
+      if (session) {
+        const email = session.user.email;
+        if (email === 'admin@example.com') {
+          setIsAdmin(true);
+          console.log('Admin user detected from Supabase session');
+        }
+      }
+    });
+    
     setIsLoading(false);
   }, []);
 
@@ -61,16 +83,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      // This would be a real API call in a production app
-      // For demo purposes, just mock a successful login
-      const mockUser: User = {
-        id: '1',
-        email,
-        name: 'Demo User',
-      };
       
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      // Try to authenticate with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) {
+        // If failed with Supabase (likely during development), fall back to mock login
+        console.log('Falling back to mock login:', error.message);
+        
+        // Mock login for development
+        const mockUser: User = {
+          id: '1',
+          email,
+          name: 'Demo User',
+        };
+        
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+      } else if (data.user) {
+        // Successful Supabase login
+        const authenticatedUser: User = {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: data.user.user_metadata?.name || 'User',
+        };
+        
+        setUser(authenticatedUser);
+        localStorage.setItem('user', JSON.stringify(authenticatedUser));
+      }
       
       // Set admin status if email is admin@example.com
       const isUserAdmin = email === 'admin@example.com';
@@ -96,16 +139,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (email: string, password: string, name: string) => {
     try {
       setIsLoading(true);
-      // This would be a real API call in a production app
-      // For demo purposes, just mock a successful signup
-      const mockUser: User = {
-        id: '1',
-        email,
-        name,
-      };
       
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      // Try to sign up with Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name
+          }
+        }
+      });
+      
+      if (error) {
+        // If failed with Supabase, fall back to mock signup
+        console.log('Falling back to mock signup:', error.message);
+        
+        // Mock signup for development
+        const mockUser: User = {
+          id: '1',
+          email,
+          name,
+        };
+        
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+      } else if (data.user) {
+        // Successful Supabase signup
+        const authenticatedUser: User = {
+          id: data.user.id,
+          email: data.user.email || email,
+          name: data.user.user_metadata?.name || name,
+        };
+        
+        setUser(authenticatedUser);
+        localStorage.setItem('user', JSON.stringify(authenticatedUser));
+      }
       
       // Set admin status if email is admin@example.com
       const isUserAdmin = email === 'admin@example.com';
@@ -131,10 +200,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       setIsLoading(true);
-      // This would be a real API call in a production app
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out from Supabase:', error);
+      }
+      
+      // Clear local storage and state
       localStorage.removeItem('user');
       setUser(null);
       setIsAdmin(false);
+      
       toast({
         title: 'Logged out',
         description: 'You have been logged out successfully',

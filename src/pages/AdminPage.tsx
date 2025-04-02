@@ -32,7 +32,7 @@ const AdminPage = () => {
     // Check if user is authenticated
     if (!user) {
       console.log('No user, redirecting to login');
-      navigate('/login');
+      navigate('/login?redirect=/admin');
       return;
     }
     
@@ -87,26 +87,25 @@ const AdminPage = () => {
     try {
       console.log("Submitting product data:", productData);
       
-      // Insert product into database
-      const { data, error } = await supabase
-        .from('products')
-        .insert([{
-          title: productData.title,
-          description: productData.description,
-          price: parseFloat(productData.price as string),
-          quantity: parseInt(productData.quantity as string),
-          category: productData.category,
-          imageurl: productData.imageUrl || '/placeholder.svg',
-          tags: productData.tags.length > 0 ? productData.tags : ['new']
-        }])
-        .select();
+      // Call the admin functions edge function to create the product
+      const { data, error } = await supabase.functions.invoke('admin-functions', {
+        body: { 
+          action: 'createProduct', 
+          data: productData,
+          userEmail: user?.email
+        }
+      });
       
       if (error) {
-        console.error("Supabase error:", error);
-        throw error;
+        console.error("Error calling admin function:", error);
+        throw new Error(error.message || 'Failed to create product');
       }
       
-      console.log("Product created successfully:", data);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create product');
+      }
+      
+      console.log("Product created successfully:", data.product);
       
       toast({
         title: 'Product Created',
@@ -128,7 +127,7 @@ const AdminPage = () => {
       console.error('Error creating product:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create product. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to create product. Please try again.',
         variant: 'destructive',
       });
     } finally {
