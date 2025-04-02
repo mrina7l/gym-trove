@@ -20,9 +20,13 @@ const LoginPage = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate(redirectPath);
+      if (isAdmin) {
+        navigate('/admin');
+      } else {
+        navigate(redirectPath);
+      }
     }
-  }, [user, navigate, redirectPath]);
+  }, [user, isAdmin, navigate, redirectPath]);
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,7 +46,7 @@ const LoginPage = () => {
       
       // Log success details
       console.log('Login successful, email:', email);
-      console.log('Is admin after login:', isAdmin);
+      console.log('Is admin after login:', email === 'admin@example.com');
       
       // Navigate to admin page directly if admin, otherwise to home
       if (email === 'admin@example.com') {

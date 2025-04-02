@@ -25,13 +25,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check for stored user on mount
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      
-      // Check admin status
-      if (parsedUser && parsedUser.email === 'admin@example.com') {
-        setIsAdmin(true);
-        console.log('Admin user detected from localStorage');
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        
+        // Check admin status
+        if (parsedUser && parsedUser.email === 'admin@example.com') {
+          setIsAdmin(true);
+          console.log('Admin user detected from localStorage');
+        }
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('user');
       }
     }
     setIsLoading(false);

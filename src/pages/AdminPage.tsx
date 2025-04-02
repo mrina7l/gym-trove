@@ -85,10 +85,12 @@ const AdminPage = () => {
     setIsSaving(true);
     
     try {
+      console.log("Submitting product data:", productData);
+      
       // Insert product into database
       const { data, error } = await supabase
         .from('products')
-        .insert({
+        .insert([{
           title: productData.title,
           description: productData.description,
           price: parseFloat(productData.price as string),
@@ -96,11 +98,15 @@ const AdminPage = () => {
           category: productData.category,
           imageurl: productData.imageUrl || '/placeholder.svg',
           tags: productData.tags.length > 0 ? productData.tags : ['new']
-        })
-        .select()
-        .single();
+        }])
+        .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+      
+      console.log("Product created successfully:", data);
       
       toast({
         title: 'Product Created',
