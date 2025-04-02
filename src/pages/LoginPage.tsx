@@ -1,5 +1,5 @@
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -12,10 +12,17 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectPath = searchParams.get('redirect') || '/';
+  
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate(redirectPath);
+    }
+  }, [user, navigate, redirectPath]);
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,8 +39,19 @@ const LoginPage = () => {
     try {
       setIsLoading(true);
       await login(email, password);
-      navigate(`/${redirectPath}`);
+      
+      // Log success details
+      console.log('Login successful, email:', email);
+      console.log('Is admin after login:', isAdmin);
+      
+      // Navigate to admin page directly if admin, otherwise to home
+      if (email === 'admin@example.com') {
+        navigate('/admin');
+      } else {
+        navigate(redirectPath);
+      }
     } catch (error) {
+      console.error('Login error:', error);
       setIsLoading(false);
     }
   };

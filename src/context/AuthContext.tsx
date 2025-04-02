@@ -31,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Check admin status
       if (parsedUser && parsedUser.email === 'admin@example.com') {
         setIsAdmin(true);
+        console.log('Admin user detected from localStorage');
       }
     }
     setIsLoading(false);
@@ -40,9 +41,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return false;
     
     try {
-      // For simplicity, we'll just check if the email is admin@example.com
-      // In a real app, you'd call the edge function to check role-based permissions
+      console.log('Checking admin status for:', user.email);
+      // For simplicity, we'll check if the email is admin@example.com
       const isUserAdmin = user.email === 'admin@example.com';
+      console.log('Is admin?', isUserAdmin);
       setIsAdmin(isUserAdmin);
       return isUserAdmin;
     } catch (error) {
@@ -67,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Set admin status if email is admin@example.com
       const isUserAdmin = email === 'admin@example.com';
+      console.log('Login: Is admin?', isUserAdmin, 'Email:', email);
       setIsAdmin(isUserAdmin);
       
       toast({
@@ -101,6 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Set admin status if email is admin@example.com
       const isUserAdmin = email === 'admin@example.com';
+      console.log('Signup: Is admin?', isUserAdmin, 'Email:', email);
       setIsAdmin(isUserAdmin);
       
       toast({

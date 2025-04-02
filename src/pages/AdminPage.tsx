@@ -31,12 +31,17 @@ const AdminPage = () => {
   useEffect(() => {
     // Check if user is authenticated
     if (!user) {
+      console.log('No user, redirecting to login');
       navigate('/login');
       return;
     }
     
+    // Log the admin status for debugging
+    console.log('Admin page: isAdmin =', isAdmin, 'email =', user.email);
+    
     // Check if user is an admin
     if (!isAdmin) {
+      console.log('User not admin, redirecting to home');
       toast({
         title: "Access Denied",
         description: "You need admin privileges to access this page",
