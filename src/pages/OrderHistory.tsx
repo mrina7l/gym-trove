@@ -14,143 +14,17 @@ import {
 } from '@/components/ui/table';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import { Package } from 'lucide-react';
+import { Package, Loader2 } from 'lucide-react';
 import { Order } from '@/types';
-
-// Mock data for orders
-const mockOrders: Order[] = [
-  {
-    id: '1001',
-    userId: '1',
-    items: [
-      {
-        productId: '1',
-        quantity: 2,
-        product: {
-          id: '1',
-          title: 'Premium Whey Protein Isolate',
-          description: 'Our highest quality whey protein with 27g of protein per serving.',
-          price: 59.99,
-          imageUrl: 'https://images.unsplash.com/photo-1579722820310-211f4d88a5a9?q=80&w=2940&auto=format&fit=crop',
-          category: 'Protein',
-          tags: ['whey', 'isolate', 'muscle building'],
-          quantity: 50,
-          createdAt: new Date().toISOString(),
-        }
-      },
-      {
-        productId: '3',
-        quantity: 1,
-        product: {
-          id: '3',
-          title: 'Pre-Workout Energy Boost',
-          description: 'Powerful pre-workout formula.',
-          price: 39.99,
-          imageUrl: 'https://images.unsplash.com/photo-1546483875-ad9014c88eba?q=80&w=2858&auto=format&fit=crop',
-          category: 'Pre-Workout',
-          tags: ['energy', 'focus', 'pump'],
-          quantity: 60,
-          createdAt: new Date().toISOString(),
-        }
-      }
-    ],
-    total: 159.97,
-    status: 'delivered',
-    shippingAddress: {
-      line1: '123 Main St',
-      city: 'New York',
-      state: 'NY',
-      postalCode: '10001',
-      country: 'US',
-    },
-    paymentIntentId: 'pi_12345',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(), // 10 days ago
-  },
-  {
-    id: '1002',
-    userId: '1',
-    items: [
-      {
-        productId: '6',
-        quantity: 1,
-        product: {
-          id: '6',
-          title: 'Creatine Monohydrate',
-          description: 'Pure creatine monohydrate for strength gains.',
-          price: 24.99,
-          imageUrl: 'https://images.unsplash.com/photo-1627467959547-215397e330e6?q=80&w=2864&auto=format&fit=crop',
-          category: 'Performance',
-          tags: ['strength', 'power', 'muscle'],
-          quantity: 75,
-          createdAt: new Date().toISOString(),
-        }
-      }
-    ],
-    total: 24.99,
-    status: 'shipped',
-    shippingAddress: {
-      line1: '123 Main St',
-      city: 'New York',
-      state: 'NY',
-      postalCode: '10001',
-      country: 'US',
-    },
-    paymentIntentId: 'pi_23456',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(), // 3 days ago
-  },
-  {
-    id: '1003',
-    userId: '1',
-    items: [
-      {
-        productId: '2',
-        quantity: 1,
-        product: {
-          id: '2',
-          title: 'Mass Gainer - Chocolate',
-          description: 'High-calorie formula with 1250 calories per serving.',
-          price: 64.99,
-          imageUrl: 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?q=80&w=2787&auto=format&fit=crop',
-          category: 'Gainers',
-          tags: ['mass gainer', 'bulking', 'weight gain'],
-          quantity: 35,
-          createdAt: new Date().toISOString(),
-        }
-      },
-      {
-        productId: '8',
-        quantity: 1,
-        product: {
-          id: '8',
-          title: 'Vitamin D3 + K2',
-          description: 'Synergistic combination of Vitamin D3 and K2.',
-          price: 17.99,
-          imageUrl: 'https://images.unsplash.com/photo-1584308074548-ad52816deb9d?q=80&w=2830&auto=format&fit=crop',
-          category: 'Vitamins',
-          tags: ['vitamin d', 'vitamin k', 'bone health'],
-          quantity: 90,
-          createdAt: new Date().toISOString(),
-        }
-      }
-    ],
-    total: 82.98,
-    status: 'processing',
-    shippingAddress: {
-      line1: '123 Main St',
-      city: 'New York',
-      state: 'NY',
-      postalCode: '10001',
-      country: 'US',
-    },
-    paymentIntentId: 'pi_34567',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(), // 6 hours ago
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { mapOrderRowsToOrders } from '@/integrations/supabase/dbTypes';
+import { toast } from '@/components/ui/use-toast';
 
 const OrderHistory = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     // Redirect if not logged in
@@ -159,8 +33,37 @@ const OrderHistory = () => {
       return;
     }
     
-    // In a real app, fetch orders from API
-    setOrders(mockOrders);
+    // Fetch orders from Supabase
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('userid', user.id)
+          .order('createdat', { ascending: false });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (data) {
+          setOrders(mapOrderRowsToOrders(data));
+        }
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load your orders. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchOrders();
   }, [user, navigate]);
   
   const getStatusBadge = (status: Order['status']) => {
@@ -188,6 +91,21 @@ const OrderHistory = () => {
       day: 'numeric',
     }).format(date);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow container mx-auto px-4 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+            <p>Loading your orders...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -225,7 +143,7 @@ const OrderHistory = () => {
               <TableBody>
                 {orders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-medium">#{order.id}</TableCell>
+                    <TableCell className="font-medium">#{order.id.substring(0, 8)}</TableCell>
                     <TableCell>{formatDate(order.createdAt)}</TableCell>
                     <TableCell>{order.items.reduce((acc, item) => acc + item.quantity, 0)} item(s)</TableCell>
                     <TableCell>${order.total.toFixed(2)}</TableCell>

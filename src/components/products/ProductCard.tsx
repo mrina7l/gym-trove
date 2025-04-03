@@ -16,6 +16,8 @@ export function ProductCard({ product }: ProductCardProps) {
     addItem(product, 1);
   };
 
+  const isOutOfStock = product.quantity <= 0;
+
   return (
     <div className="product-card overflow-hidden">
       <Link to={`/products/${product.id}`}>
@@ -24,8 +26,11 @@ export function ProductCard({ product }: ProductCardProps) {
             src={product.imageUrl}
             alt={product.title}
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/placeholder.svg';
+            }}
           />
-          {product.quantity === 0 && (
+          {isOutOfStock && (
             <div className="absolute top-0 right-0 m-2">
               <Badge variant="destructive">Out of Stock</Badge>
             </div>
@@ -43,11 +48,11 @@ export function ProductCard({ product }: ProductCardProps) {
           <span className="font-bold text-lg">${product.price.toFixed(2)}</span>
           <Button 
             onClick={handleAddToCart}
-            disabled={product.quantity === 0}
-            variant={product.quantity === 0 ? "outline" : "default"}
+            disabled={isOutOfStock}
+            variant={isOutOfStock ? "outline" : "default"}
             size="sm"
           >
-            {product.quantity === 0 ? 'Out of Stock' : 'Add to Cart'}
+            {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
           </Button>
         </div>
       </div>

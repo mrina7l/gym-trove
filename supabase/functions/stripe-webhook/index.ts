@@ -51,11 +51,15 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    );
+    // Initialize Supabase client with service role for admin privileges
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration');
+    }
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Handle the event
     if (event.type === 'checkout.session.completed') {
@@ -72,13 +76,14 @@ serve(async (req) => {
       }
       
       // Create the order
-      const { data: order, error: orderError } = await supabaseClient
+      const { data: order, error: orderError } = await supabaseAdmin
         .from('orders')
         .insert({
           userid: userId,
           items: items.map(item => ({
             productId: item.productId,
-            quantity: item.quantity
+            quantity: item.quantity,
+            product: item.product  // Ensure product details are stored with the order
           })),
           total: total,
           status: 'paid',
@@ -93,24 +98,41 @@ serve(async (req) => {
         throw new Error(`Failed to create order: ${orderError.message}`);
       }
       
-      // Update inventory
+      console.log(`Order ${order.id} created successfully, updating inventory...`);
+      
+      // Update inventory by decrementing quantity for each product
       for (const item of items) {
-        const { error: updateError } = await supabaseClient
+        console.log(`Updating product ${item.productId} quantity: decrementing by ${item.quantity}`);
+        
+        const { data: product, error: getProductError } = await supabaseAdmin
           .from('products')
-          .update({
-            quantity: supabaseClient.rpc('decrement_quantity', { 
-              p_id: item.productId, 
-              qty: item.quantity 
-            })
-          })
+          .select('quantity')
+          .eq('id', item.productId)
+          .single();
+        
+        if (getProductError) {
+          console.error(`Error getting product ${item.productId}:`, getProductError);
+          continue;
+        }
+        
+        const currentQuantity = product.quantity;
+        const newQuantity = Math.max(0, currentQuantity - item.quantity);
+        
+        console.log(`Product ${item.productId}: current quantity = ${currentQuantity}, new quantity = ${newQuantity}`);
+        
+        const { error: updateError } = await supabaseAdmin
+          .from('products')
+          .update({ quantity: newQuantity })
           .eq('id', item.productId);
           
         if (updateError) {
           console.error(`Error updating product ${item.productId} quantity:`, updateError);
+        } else {
+          console.log(`Successfully updated product ${item.productId} quantity to ${newQuantity}`);
         }
       }
       
-      console.log(`Order ${order.id} created successfully`);
+      console.log(`Order ${order.id} processing completed successfully`);
     }
 
     return new Response(JSON.stringify({ received: true }), {

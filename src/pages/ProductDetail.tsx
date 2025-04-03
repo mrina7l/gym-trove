@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
@@ -5,8 +6,9 @@ import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { Product } from '@/types';
-import { ChevronLeft, ShoppingCart, Loader2 } from 'lucide-react';
+import { ChevronLeft, ShoppingCart, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -70,6 +72,8 @@ const ProductDetail = () => {
     }
   };
 
+  const isOutOfStock = product && product.quantity <= 0;
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -119,7 +123,15 @@ const ProductDetail = () => {
               src={product.imageUrl}
               alt={product.title}
               className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/placeholder.svg';
+              }}
             />
+            {isOutOfStock && (
+              <div className="absolute top-4 right-4">
+                <Badge variant="destructive" className="px-3 py-1 text-sm">Out of Stock</Badge>
+              </div>
+            )}
           </div>
           
           <div>
@@ -128,29 +140,39 @@ const ProductDetail = () => {
             
             <div className="flex items-center justify-between mb-4">
               <span className="font-bold text-2xl">${product.price.toFixed(2)}</span>
-              <div className="text-gray-500">
-                {product.quantity} in stock
+              <div className={`${isOutOfStock ? 'text-red-500 font-medium flex items-center' : 'text-gray-500'}`}>
+                {isOutOfStock ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 mr-1" />
+                    Out of Stock
+                  </>
+                ) : (
+                  `${product.quantity} in stock`
+                )}
               </div>
             </div>
             
             <div className="flex items-center space-x-4 mb-6">
-              <div className="flex items-center space-x-2">
-                <label htmlFor="quantity" className="text-sm font-medium">Quantity:</label>
-                <select
-                  id="quantity"
-                  value={quantity}
-                  onChange={handleQuantityChange}
-                  className="block w-24 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
-                >
-                  {Array.from({ length: Math.min(10, product.quantity) }, (_, i) => i + 1).map((num) => (
-                    <option key={num} value={num}>{num}</option>
-                  ))}
-                </select>
-              </div>
+              {!isOutOfStock && (
+                <div className="flex items-center space-x-2">
+                  <label htmlFor="quantity" className="text-sm font-medium">Quantity:</label>
+                  <select
+                    id="quantity"
+                    value={quantity}
+                    onChange={handleQuantityChange}
+                    className="block w-24 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                    disabled={isOutOfStock}
+                  >
+                    {Array.from({ length: Math.min(10, product.quantity) }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>{num}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
-              <Button onClick={handleAddToCart} disabled={product.quantity === 0}>
+              <Button onClick={handleAddToCart} disabled={isOutOfStock}>
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                Add to Cart
+                {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
               </Button>
             </div>
             
@@ -162,7 +184,7 @@ const ProductDetail = () => {
             {product.tags.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-lg font-medium mb-2">Tags:</h4>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   {product.tags.map((tag) => (
                     <span key={tag} className="px-2 py-1 rounded-full bg-gray-100 text-gray-600 text-sm">{tag}</span>
                   ))}
