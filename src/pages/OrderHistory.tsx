@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Loader2 } from 'lucide-react';
 import { Order } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
-import { mapOrderRowsToOrders } from '@/integrations/supabase/dbTypes';
+import { mapOrderRowsToOrders, OrderRow } from '@/integrations/supabase/dbTypes';
 import { toast } from '@/components/ui/use-toast';
 
 const OrderHistory = () => {
@@ -49,7 +49,21 @@ const OrderHistory = () => {
         }
         
         if (data) {
-          setOrders(mapOrderRowsToOrders(data));
+          // Validate the status values to ensure they match the expected types
+          const validatedData = data.map(order => {
+            // Check if the status is valid, default to 'pending' if not
+            const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+            const status = validStatuses.includes(order.status) 
+              ? order.status as OrderRow['status'] 
+              : 'pending' as OrderRow['status'];
+            
+            return {
+              ...order,
+              status
+            } as OrderRow;
+          });
+          
+          setOrders(mapOrderRowsToOrders(validatedData));
         }
       } catch (error) {
         console.error('Error fetching orders:', error);
