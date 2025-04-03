@@ -38,6 +38,8 @@ const OrderHistory = () => {
       try {
         setLoading(true);
         
+        console.log('Fetching orders for user:', user.id);
+        
         const { data, error } = await supabase
           .from('orders')
           .select('*')
@@ -45,8 +47,11 @@ const OrderHistory = () => {
           .order('createdat', { ascending: false });
         
         if (error) {
+          console.error('Supabase error fetching orders:', error);
           throw error;
         }
+        
+        console.log('Orders data from database:', data);
         
         if (data) {
           // Validate the status values to ensure they match the expected types
@@ -63,7 +68,9 @@ const OrderHistory = () => {
             } as OrderRow;
           });
           
-          setOrders(mapOrderRowsToOrders(validatedData));
+          const mappedOrders = mapOrderRowsToOrders(validatedData);
+          console.log('Mapped orders:', mappedOrders);
+          setOrders(mappedOrders);
         }
       } catch (error) {
         console.error('Error fetching orders:', error);

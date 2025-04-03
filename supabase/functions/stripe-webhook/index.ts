@@ -71,11 +71,13 @@ serve(async (req) => {
       const items = JSON.parse(session.metadata.items);
       const total = parseFloat(session.metadata.total);
       
+      console.log('Order details:', { userId, items, total });
+      
       if (!userId || !items || !total) {
         throw new Error('Missing order details in session metadata');
       }
       
-      // Create the order - ensure status is one of the valid types
+      // Create the order with a valid status from our enum
       const { data: order, error: orderError } = await supabaseAdmin
         .from('orders')
         .insert({
@@ -86,7 +88,7 @@ serve(async (req) => {
             product: item.product  // Ensure product details are stored with the order
           })),
           total: total,
-          status: 'paid', // This will be automatically converted to 'processing' below
+          status: 'processing', // Use a valid status from the enum directly
           paymentintentid: session.payment_intent,
           shippingaddress: session.shipping || { line1: '', city: '', state: '', postalCode: '', country: '' }
         })
@@ -96,16 +98,6 @@ serve(async (req) => {
       if (orderError) {
         console.error('Error creating order:', orderError);
         throw new Error(`Failed to create order: ${orderError.message}`);
-      }
-      
-      // Update the order status to a valid value from our enum
-      const { error: updateStatusError } = await supabaseAdmin
-        .from('orders')
-        .update({ status: 'processing' }) // Use a valid status from the enum
-        .eq('id', order.id);
-      
-      if (updateStatusError) {
-        console.error('Error updating order status:', updateStatusError);
       }
       
       console.log(`Order ${order.id} created successfully, updating inventory...`);
